@@ -1,247 +1,302 @@
 
-    package ma.emsi.sabri.tp1sabri.jsf;
+package ma.emsi.sabri.tp1sabri.jsf;
 
-    import ma.emsi.sabri.tp1sabri.service.GenerateurReponse;
-    import jakarta.faces.application.FacesMessage;
-    import jakarta.faces.context.FacesContext;
-    import jakarta.faces.model.SelectItem;
-    import jakarta.faces.view.ViewScoped;
-    import jakarta.inject.Inject;
-    import jakarta.inject.Named;
-    import java.io.Serializable;
-    import java.util.ArrayList;
-    import java.util.List;
+import ma.emsi.sabri.tp1sabri.llm.GenerateurReponse;
+import jakarta.faces.application.FacesMessage;
+import jakarta.faces.context.FacesContext;
+import jakarta.faces.model.SelectItem;
+import jakarta.faces.view.ViewScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Backing bean pour la page JSF index.xhtml.
+ *
+ * Gère les interactions avec l'utilisateur, les messages
+ * d'erreur et l'historique de la conversation.
+ *
+ * Le traitement de chiffrement et de déchiffrement César
+ * est réalisé par le service GenerateurReponse.
+ *
+ * @ViewScoped permet de conserver l'état de la conversation
+ * pendant plusieurs requêtes HTTP sur la même vue.
+ */
+@Named
+@ViewScoped
+public class Bb implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     /**
-     * Backing bean pour la page JSF index.xhtml.
-     *
-     * Gère les interactions avec l'utilisateur, les messages
-     * d'erreur et l'historique de la conversation.
-     *
-     * Le traitement de chiffrement et de déchiffrement César
-     * est réalisé par le service GenerateurReponse.
-     *
-     * @ViewScoped permet de conserver l'état de la conversation
-     * pendant plusieurs requêtes HTTP sur la même vue.
+     * Rôle sélectionné par l'utilisateur.
      */
-    @Named
-    @ViewScoped
-    public class Bb implements Serializable {
+    private String roleSysteme;
 
-        private static final long serialVersionUID = 1L;
+    /**
+     * Le rôle peut être modifié avant le premier message.
+     */
+    private boolean roleSystemeChangeable = true;
 
-        /**
-         * Rôle sélectionné par l'utilisateur.
-         */
-        private String roleSysteme;
+    /**
+     * Liste des rôles disponibles.
+     */
+    private List<SelectItem> listeRolesSysteme;
 
-        /**
-         * Le rôle peut être modifié avant le premier message.
-         */
-        private boolean roleSystemeChangeable = true;
+    /**
+     * Dernière question ou commande de l'utilisateur.
+     */
+    private String question;
 
-        /**
-         * Liste des rôles disponibles.
-         */
-        private List<SelectItem> listeRolesSysteme;
+    /**
+     * Dernière réponse générée par le service.
+     */
+    private String reponse = "";
 
-        /**
-         * Dernière question ou commande de l'utilisateur.
-         */
-        private String question;
+    /**
+     * Historique de la conversation.
+     */
+    private StringBuilder conversation = new StringBuilder();
 
-        /**
-         * Dernière réponse générée par le service.
-         */
-        private String reponse = "";
+    // ==============================
+    // AJOUT TP1 : MODE DEBUG
+    // ==============================
 
-        /**
-         * Historique de la conversation.
-         */
-        private StringBuilder conversation = new StringBuilder();
+    /**
+     * Active ou désactive l'affichage du mode debug.
+     */
+    private boolean debug = false;
 
-        /**
-         * Service CDI responsable du traitement César.
-         */
-        @Inject
-        private GenerateurReponse generateurReponse;
+    /**
+     * JSON envoyé dans la requête au LLM.
+     */
+    private String texteRequeteJson = "";
 
-        /**
-         * Contexte JSF pour afficher les messages d'erreur.
-         */
-        @Inject
-        private FacesContext facesContext;
+    /**
+     * JSON retourné dans la réponse du LLM.
+     */
+    private String texteReponseJson = "";
 
-        /**
-         * Constructeur sans argument.
-         */
-        public Bb() {
-        }
+    // ==============================
+    // FIN AJOUT TP1
+    // ==============================
 
-        // ==============================
-        // GETTERS ET SETTERS
-        // ==============================
+    /**
+     * Service CDI responsable du traitement César.
+     */
+    @Inject
+    private GenerateurReponse generateurReponse;
 
-        public String getRoleSysteme() {
-            return roleSysteme;
-        }
+    /**
+     * Contexte JSF pour afficher les messages d'erreur.
+     */
+    @Inject
+    private FacesContext facesContext;
 
-        public void setRoleSysteme(String roleSysteme) {
-            this.roleSysteme = roleSysteme;
-        }
+    /**
+     * Constructeur sans argument.
+     */
+    public Bb() {
+    }
 
-        public boolean isRoleSystemeChangeable() {
-            return roleSystemeChangeable;
-        }
+    // ==============================
+    // GETTERS ET SETTERS
+    // ==============================
 
-        public String getQuestion() {
-            return question;
-        }
+    public String getRoleSysteme() {
+        return roleSysteme;
+    }
 
-        public void setQuestion(String question) {
-            this.question = question;
-        }
+    public void setRoleSysteme(String roleSysteme) {
+        this.roleSysteme = roleSysteme;
+    }
 
-        public String getReponse() {
-            return reponse;
-        }
+    public boolean isRoleSystemeChangeable() {
+        return roleSystemeChangeable;
+    }
 
-        public void setReponse(String reponse) {
-            this.reponse = reponse;
-        }
+    public String getQuestion() {
+        return question;
+    }
 
-        public String getConversation() {
-            return conversation.toString();
-        }
+    public void setQuestion(String question) {
+        this.question = question;
+    }
 
-        public void setConversation(String conversation) {
-            this.conversation = new StringBuilder(conversation);
-        }
+    public String getReponse() {
+        return reponse;
+    }
 
-        // ==============================
-        // ENVOI DE LA QUESTION
-        // ==============================
+    public void setReponse(String reponse) {
+        this.reponse = reponse;
+    }
 
-        /**
-         * Traite une commande saisie par l'utilisateur.
-         *
-         * Exemples :
-         * encrypt: BONJOUR
-         * decrypt: ERQMRXU
-         *
-         * @return null pour rester sur la même page.
-         */
-        public String envoyer() {
+    public String getConversation() {
+        return conversation.toString();
+    }
 
-            // 1. Vérifier si la question est vide.
-            if (question == null || question.isBlank()) {
+    public void setConversation(String conversation) {
+        this.conversation = new StringBuilder(conversation);
+    }
 
-                FacesMessage message = new FacesMessage(
-                        FacesMessage.SEVERITY_ERROR,
-                        "Texte question vide",
-                        "Il manque le texte de la question"
-                );
+    // ==============================
+    // AJOUT TP1 : GETTERS ET SETTERS
+    // ==============================
 
-                facesContext.addMessage(null, message);
+    public boolean isDebug() {
+        return debug;
+    }
 
-                return null;
-            }
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
 
-            // 2. Récupérer le rôle au début de la conversation.
-            String roleSystemePourModification = null;
+    public String getTexteRequeteJson() {
+        return texteRequeteJson;
+    }
 
-            if (this.conversation.isEmpty()) {
+    public void setTexteRequeteJson(String texteRequeteJson) {
+        this.texteRequeteJson = texteRequeteJson;
+    }
 
-                roleSystemePourModification = this.roleSysteme;
+    public String getTexteReponseJson() {
+        return texteReponseJson;
+    }
 
-                // Bloquer le rôle après le premier message.
-                this.roleSystemeChangeable = false;
-            }
+    public void setTexteReponseJson(String texteReponseJson) {
+        this.texteReponseJson = texteReponseJson;
+    }
 
-            // 3. Appeler le service de chiffrement/déchiffrement.
-            // On utilise = au lieu de += pour ne conserver
-            // que la réponse correspondant à la question actuelle.
-            this.reponse = this.generateurReponse.genererReponse(
-                    this.question,
-                    roleSystemePourModification
+    // ==============================
+    // FIN AJOUT TP1
+    // ==============================
+
+    // ==============================
+    // ENVOI DE LA QUESTION
+    // ==============================
+
+    /**
+     * Traite une commande saisie par l'utilisateur.
+     *
+     * Exemples :
+     * encrypt: BONJOUR
+     * decrypt: ERQMRXU
+     *
+     * @return null pour rester sur la même page.
+     */
+    public String envoyer() {
+
+        // 1. Vérifier si la question est vide.
+        if (question == null || question.isBlank()) {
+
+            FacesMessage message = new FacesMessage(
+                    FacesMessage.SEVERITY_ERROR,
+                    "Texte question vide",
+                    "Il manque le texte de la question"
             );
 
-            // 4. Ajouter la question et la réponse à l'historique.
-            afficherConversation();
+            facesContext.addMessage(null, message);
 
-            // 5. Rester sur la page actuelle.
             return null;
         }
 
-        // ==============================
-        // NOUVEAU CHAT
-        // ==============================
+        // 2. Récupérer le rôle au début de la conversation.
+        String roleSystemePourModification = null;
 
-        /**
-         * Démarre une nouvelle conversation.
-         *
-         * La navigation vers index.xhtml permet de
-         * réinitialiser l'état du backing bean ViewScoped.
-         *
-         * @return "index" pour revenir à la page initiale.
-         */
-        public String nouveauChat() {
-            return "index";
+        if (this.conversation.isEmpty()) {
+
+            roleSystemePourModification = this.roleSysteme;
+
+            // Bloquer le rôle après le premier message.
+            this.roleSystemeChangeable = false;
         }
 
-        // ==============================
-        // HISTORIQUE
-        // ==============================
+        // 3. Appeler le service de chiffrement/déchiffrement.
+        // On utilise = au lieu de += pour ne conserver
+        // que la réponse correspondant à la question actuelle.
+        this.reponse = this.generateurReponse.genererReponse(
+                this.question,
+                roleSystemePourModification
+        );
 
-        /**
-         * Ajoute la question et sa réponse à l'historique.
-         */
-        private void afficherConversation() {
+        // 4. Ajouter la question et la réponse à l'historique.
+        afficherConversation();
 
-            this.conversation
-                    .append("== User:\n")
-                    .append(this.question)
-                    .append("\n== Serveur:\n")
-                    .append(this.reponse)
-                    .append("\n\n");
-        }
-
-        // ==============================
-        // RÔLES SYSTÈME
-        // ==============================
-
-        /**
-         * Retourne les rôles disponibles dans la liste
-         * déroulante de la page index.xhtml.
-         */
-        public List<SelectItem> getRolesSysteme() {
-
-            if (this.listeRolesSysteme == null) {
-
-                this.listeRolesSysteme = new ArrayList<>();
-
-                this.listeRolesSysteme.add(
-                        new SelectItem(
-                                "Assistant de chiffrement Cesar",
-                                "Assistant"
-                        )
-                );
-
-                this.listeRolesSysteme.add(
-                        new SelectItem(
-                                "Specialiste du chiffrement de messages",
-                                "Cryptographe"
-                        )
-                );
-
-                this.listeRolesSysteme.add(
-                        new SelectItem(
-                                "Specialiste du dechiffrement de messages",
-                                "Decrypteur"
-                        )
-                );
-            }
-
-            return this.listeRolesSysteme;
-        }
+        // 5. Rester sur la page actuelle.
+        return null;
     }
+
+    // ==============================
+    // NOUVEAU CHAT
+    // ==============================
+
+    /**
+     * Démarre une nouvelle conversation.
+     *
+     * La navigation vers index.xhtml permet de
+     * réinitialiser l'état du backing bean ViewScoped.
+     *
+     * @return "index" pour revenir à la page initiale.
+     */
+    public String nouveauChat() {
+        return "index";
+    }
+
+    // ==============================
+    // HISTORIQUE
+    // ==============================
+
+    /**
+     * Ajoute la question et sa réponse à l'historique.
+     */
+    private void afficherConversation() {
+
+        this.conversation
+                .append("== User:\n")
+                .append(this.question)
+                .append("\n== Serveur:\n")
+                .append(this.reponse)
+                .append("\n\n");
+    }
+
+    // ==============================
+    // RÔLES SYSTÈME
+    // ==============================
+
+    /**
+     * Retourne les rôles disponibles dans la liste
+     * déroulante de la page index.xhtml.
+     */
+    public List<SelectItem> getRolesSysteme() {
+
+        if (this.listeRolesSysteme == null) {
+
+            this.listeRolesSysteme = new ArrayList<>();
+
+            this.listeRolesSysteme.add(
+                    new SelectItem(
+                            "Assistant de chiffrement Cesar",
+                            "Assistant"
+                    )
+            );
+
+            this.listeRolesSysteme.add(
+                    new SelectItem(
+                            "Specialiste du chiffrement de messages",
+                            "Cryptographe"
+                    )
+            );
+
+            this.listeRolesSysteme.add(
+                    new SelectItem(
+                            "Specialiste du dechiffrement de messages",
+                            "Decrypteur"
+                    )
+            );
+        }
+
+        return this.listeRolesSysteme;
+    }
+}
