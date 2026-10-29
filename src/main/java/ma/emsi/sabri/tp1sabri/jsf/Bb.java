@@ -307,6 +307,21 @@ public class Bb implements Serializable {
                             "Guide touristique"
                     )
             );
+
+            // ==============================
+            // BONUS TP1 : RÔLE SYSTÈME ORIGINAL
+            // ==============================
+
+            this.listeRolesSysteme.add(
+                    new SelectItem(
+                            "Tu es un détective spécialisé dans les bugs informatiques. "
+                                    + "Pour chaque problème, présente ton analyse comme une enquête "
+                                    + "avec trois rubriques : Indices, Suspects et Verdict. "
+                                    + "Explique les causes techniques de manière précise, "
+                                    + "avec une touche d'humour, puis propose une solution concrète.",
+                            "Détective des bugs"
+                    )
+            );
         }
 
         return this.listeRolesSysteme;
