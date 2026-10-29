@@ -1,7 +1,9 @@
 
 package ma.emsi.sabri.tp1sabri.jsf;
 
-import ma.emsi.sabri.tp1sabri.llm.GenerateurReponse;
+import ma.emsi.sabri.tp1sabri.llm.JsonAdapterPourGemini;
+import ma.emsi.sabri.tp1sabri.llm.LlmInteraction;
+import java.util.Arrays;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.model.SelectItem;
@@ -17,9 +19,6 @@ import java.util.List;
  *
  * Gère les interactions avec l'utilisateur, les messages
  * d'erreur et l'historique de la conversation.
- *
- * Le traitement de chiffrement et de déchiffrement César
- * est réalisé par le service GenerateurReponse.
  *
  * @ViewScoped permet de conserver l'état de la conversation
  * pendant plusieurs requêtes HTTP sur la même vue.
@@ -84,10 +83,10 @@ public class Bb implements Serializable {
     // ==============================
 
     /**
-     * Service CDI responsable du traitement César.
+     * Adaptateur CDI pour communiquer avec l'API Gemini.
      */
     @Inject
-    private GenerateurReponse generateurReponse;
+    private JsonAdapterPourGemini jsonAdapter;
 
     /**
      * Contexte JSF pour afficher les messages d'erreur.
@@ -178,11 +177,7 @@ public class Bb implements Serializable {
     // ==============================
 
     /**
-     * Traite une commande saisie par l'utilisateur.
-     *
-     * Exemples :
-     * encrypt: BONJOUR
-     * decrypt: ERQMRXU
+     * Traite une question saisie par l'utilisateur.
      *
      * @return null pour rester sur la même page.
      */
@@ -203,23 +198,40 @@ public class Bb implements Serializable {
         }
 
         // 2. Récupérer le rôle au début de la conversation.
-        String roleSystemePourModification = null;
-
         if (this.conversation.isEmpty()) {
 
-            roleSystemePourModification = this.roleSysteme;
+            // Envoyer le rôle système à JsonAdapter
+            this.jsonAdapter.setSystemRole(this.roleSysteme);
 
-            // Bloquer le rôle après le premier message.
+            // Bloquer le rôle après le premier message
             this.roleSystemeChangeable = false;
         }
 
-        // 3. Appeler le service de chiffrement/déchiffrement.
+        // 3. Envoyer la question à l'API Gemini.
         // On utilise = au lieu de += pour ne conserver
         // que la réponse correspondant à la question actuelle.
-        this.reponse = this.generateurReponse.genererReponse(
-                this.question,
-                roleSystemePourModification
-        );
+        try {
+            LlmInteraction interaction = jsonAdapter.envoyerRequete(question);
+
+            this.reponse = interaction.reponseExtraite();
+            this.texteRequeteJson = interaction.questionJson();
+            this.texteReponseJson = interaction.reponseJson();
+
+        } catch (Exception e) {
+
+            this.reponse = "Erreur : " + e.getMessage();
+
+            FacesMessage message = new FacesMessage(
+                    FacesMessage.SEVERITY_ERROR,
+                    "Problème de connexion avec l'API du LLM",
+                    "Problème de connexion avec l'API du LLM"
+                            + e.getMessage()
+                            + "\n"
+                            + Arrays.toString(e.getStackTrace())
+            );
+
+            facesContext.addMessage(null, message);
+        }
 
         // 4. Ajouter la question et la réponse à l'historique.
         afficherConversation();
@@ -277,22 +289,22 @@ public class Bb implements Serializable {
 
             this.listeRolesSysteme.add(
                     new SelectItem(
-                            "Assistant de chiffrement Cesar",
+                            "Tu es un assistant utile. Réponds clairement aux questions de l'utilisateur.",
                             "Assistant"
                     )
             );
 
             this.listeRolesSysteme.add(
                     new SelectItem(
-                            "Specialiste du chiffrement de messages",
-                            "Cryptographe"
+                            "Tu es un traducteur. Traduis les textes anglais en français.",
+                            "Traducteur anglais-français"
                     )
             );
 
             this.listeRolesSysteme.add(
                     new SelectItem(
-                            "Specialiste du dechiffrement de messages",
-                            "Decrypteur"
+                            "Tu es un guide touristique. Aide l'utilisateur à découvrir des destinations et des lieux touristiques.",
+                            "Guide touristique"
                     )
             );
         }
